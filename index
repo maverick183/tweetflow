@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TweetFlow • Powered by Grok</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .tweet-box { white-space: pre-wrap; line-height: 1.4; }
+  </style>
+</head>
+<body class="bg-[#050505] text-white min-h-screen">
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    <div class="sticky top-0 z-50 backdrop-blur-xl bg-[#050505]/70 border-b border-white/10 py-4 mb-8">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white text-black rounded-2xl flex items-center justify-center text-3xl">𝕏</div>
+          <h1 class="text-4xl font-semibold tracking-tighter">TweetFlow</h1>
+          <span class="text-emerald-400 text-sm font-medium px-3 py-1 bg-emerald-900/30 rounded-2xl">Public • Powered by Grok</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-10">
+      <div>
+        <div class="flex justify-between items-baseline mb-3">
+          <label class="text-zinc-400 font-medium">Paste your messy idea here</label>
+          <div onclick="loadExample()" class="text-blue-400 text-sm cursor-pointer hover:underline flex items-center gap-1">
+            <i class="fas fa-lightbulb"></i> Try example
+          </div>
+        </div>
+        <textarea id="input" rows="9" class="w-full bg-zinc-900 border border-white/10 rounded-3xl p-8 text-lg placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 resize-none" placeholder="today i went gym felt super motivated but traffic was hell now im tired af but still wanna post about consistency"></textarea>
+
+        <p class="text-zinc-400 font-medium mt-8 mb-4">Choose vibe</p>
+        <div id="tones" class="flex flex-wrap gap-3"></div>
+
+        <button onclick="generateTweet()" class="mt-10 w-full py-6 bg-white text-black font-semibold text-2xl rounded-3xl flex items-center justify-center gap-4 hover:scale-105 transition">
+          <i class="fas fa-magic"></i> Generate Human Tweet
+        </button>
+      </div>
+
+      <div id="output-section" class="hidden">
+        <div class="bg-zinc-900 border border-white/10 rounded-3xl p-8">
+          <div class="flex justify-between text-sm mb-4">
+            <span class="text-emerald-400 font-medium">✅ Your tweet is ready</span>
+            <span id="char-count" class="font-mono"></span>
+          </div>
+          <div id="tweet" class="tweet-box bg-[#050505] border border-white/10 rounded-3xl p-8 text-xl leading-relaxed min-h-[180px]"></div>
+
+          <div class="flex gap-4 mt-8">
+            <button onclick="copyTweet()" class="flex-1 py-5 bg-white/10 hover:bg-white/20 rounded-3xl font-medium flex items-center justify-center gap-3">
+              <i class="fas fa-copy"></i> Copy Tweet
+            </button>
+            <button onclick="regenerateTweet()" class="flex-1 py-5 bg-white/10 hover:bg-white/20 rounded-3xl font-medium flex items-center justify-center gap-3">
+              <i class="fas fa-redo"></i> Regenerate
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tones = [
+      {name:"Fun / Playful", emoji:"😄", value:"fun"},
+      {name:"Aggressive / Spicy", emoji:"🔥", value:"aggressive"},
+      {name:"Sarcastic / Savage", emoji:"😏", value:"sarcastic"},
+      {name:"Motivational / Fire", emoji:"🚀", value:"motivational"},
+      {name:"Casual / Chill", emoji:"☕", value:"casual"},
+      {name:"Professional", emoji:"💼", value:"professional"},
+      {name:"Witty / Clever", emoji:"🧠", value:"witty"},
+      {name:"Controversial", emoji:"⚡", value:"controversial"},
+      {name:"Meme Style", emoji:"😂", value:"meme"}
+    ]
+
+    let selectedTone = "fun"
+    let lastInput = ""
+    let lastTweet = ""
+
+    function renderTones() {
+      const container = document.getElementById('tones')
+      container.innerHTML = tones.map(t => `
+        <button onclick="selectTone('${t.value}')" 
+          class="px-6 py-4 rounded-3xl text-base flex items-center gap-3 transition-all ${selectedTone === t.value ? 'bg-white text-black shadow-lg' : 'bg-white/10 hover:bg-white/20'}">
+          ${t.emoji} ${t.name}
+        </button>
+      `).join('')
+    }
+
+    window.selectTone = (tone) => { selectedTone = tone; renderTones() }
+
+    async function generateTweet() {
+      const input = document.getElementById('input').value.trim()
+      if (!input) return alert("Paste something first!")
+
+      const btn = document.querySelector('button[onclick="generateTweet()"]')
+      const origHTML = btn.innerHTML
+      btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Grok is cooking...`
+      btn.disabled = true
+
+      lastInput = input
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            input: input,
+            tone: selectedTone 
+          })
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Something went wrong")
+
+        lastTweet = data.tweet
+
+        document.getElementById('output-section').classList.remove('hidden')
+        document.getElementById('tweet').innerHTML = lastTweet.replace(/\n/g, '<br>')
+        
+        const countEl = document.getElementById('char-count')
+        const count = lastTweet.length
+        countEl.innerHTML = `${count}/280`
+        countEl.style.color = count > 280 ? '#f43f5e' : '#10b981'
+
+      } catch(e) {
+        alert("Error: " + e.message)
+      } finally {
+        btn.innerHTML = origHTML
+        btn.disabled = false
+      }
+    }
+
+    function copyTweet() {
+      navigator.clipboard.writeText(lastTweet).then(() => {
+        const b = event.currentTarget
+        const old = b.innerHTML
+        b.innerHTML = `<i class="fas fa-check"></i> Copied!`
+        setTimeout(() => b.innerHTML = old, 1800)
+      })
+    }
+
+    function regenerateTweet() {
+      document.getElementById('input').value = lastInput
+      generateTweet()
+    }
+
+    function loadExample() {
+      const examples = [
+        "today i went gym felt super motivated but traffic was hell now im tired af but still wanna post about consistency",
+        "bro i just hit pr on bench but my form was trash and now my shoulder hurts lol",
+        "why do people still believe this nonsense? the data clearly shows otherwise"
+      ]
+      document.getElementById('input').value = examples[Math.floor(Math.random()*examples.length)]
+      generateTweet()
+    }
+
+    window.onload = () => { renderTones() }
+  </script>
+</body>
+</html>
